@@ -372,7 +372,7 @@ const PatientDashboard = ({ web3, account, contract }) => {
             </div>
           )}
         </Modal.Body>
-        <Modal.Footer>
+        {/* <Modal.Footer>
           {selectedRecord && selectedRecord.isActive && (
             <Button
               variant="warning"
@@ -386,7 +386,7 @@ const PatientDashboard = ({ web3, account, contract }) => {
           <Button variant="secondary" onClick={() => setShowRecordModal(false)}>
             Close
           </Button>
-        </Modal.Footer>
+        </Modal.Footer> */}
       </Modal>
     </div>
   );
