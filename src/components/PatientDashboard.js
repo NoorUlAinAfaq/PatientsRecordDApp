@@ -5,7 +5,6 @@ const PatientDashboard = ({ web3, account, contract }) => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [patientRecords, setPatientRecords] = useState([]);
-  const [recordDetails, setRecordDetails] = useState({});
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [loadingRecords, setLoadingRecords] = useState({});
@@ -107,40 +106,6 @@ const PatientDashboard = ({ web3, account, contract }) => {
     }
   };
 
-  // Deactivate a record
-  const deactivateRecord = async (recordId) => {
-    try {
-      setLoading(true);
-      setMessage({ type: '', text: '' });
-
-      // Estimate gas
-      const gasEstimate = await contract.methods.deactivateRecord(recordId).estimateGas({ from: account });
-      
-      // Send transaction
-      await contract.methods.deactivateRecord(recordId).send({
-        from: account,
-        gas: Math.floor(gasEstimate * 1.2)
-      });
-
-      setMessage({ 
-        type: 'success', 
-        text: `Record #${recordId} has been deactivated successfully!` 
-      });
-      
-      // Reload records
-      await loadPatientRecords();
-      setShowRecordModal(false);
-      
-    } catch (error) {
-      console.error('Error deactivating record:', error);
-      setMessage({ 
-        type: 'danger', 
-        text: `Error deactivating record: ${error.message}` 
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Copy IPFS hash to clipboard
   const copyToClipboard = (text) => {
@@ -372,21 +337,7 @@ const PatientDashboard = ({ web3, account, contract }) => {
             </div>
           )}
         </Modal.Body>
-        {/* <Modal.Footer>
-          {selectedRecord && selectedRecord.isActive && (
-            <Button
-              variant="warning"
-              onClick={() => deactivateRecord(selectedRecord.id)}
-              disabled={loading}
-            >
-              {loading ? <Spinner size="sm" className="me-2" /> : null}
-              Deactivate Record
-            </Button>
-          )}
-          <Button variant="secondary" onClick={() => setShowRecordModal(false)}>
-            Close
-          </Button>
-        </Modal.Footer> */}
+      
       </Modal>
     </div>
   );

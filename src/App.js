@@ -8,11 +8,10 @@ import DoctorDashboard from './components/DoctorDashboard';
 import AdminDashboard from './components/AdminDashboard';
 
 // Replace with your deployed contract address
-const CONTRACT_ADDRESS = '0x1Db1c29Fec46eD8F4cfa4Cc5A221601cE8Af4Ba3';
+const CONTRACT_ADDRESS = '0x313F8f157eCCd52939a978cf85b45A98b852e24D';
 
 // Your contract ABI (copy from Remix after compilation)
-const CONTRACT_ABI = 
-[
+const CONTRACT_ABI = [
 	{
 		"inputs": [
 			{
@@ -445,16 +444,15 @@ const CONTRACT_ABI =
 		"stateMutability": "view",
 		"type": "function"
 	}
-
 ]
 
 // Polygon Amoy Testnet Configuration
 const POLYGON_AMOY_CONFIG = {
-  chainId: '0x13882', // 80002 in hex
+  chainId: '80002', // 80002 in hex
   chainName: 'Polygon Amoy Testnet',
   nativeCurrency: {
-    name: 'MATIC',
-    symbol: 'MATIC',
+    name: 'POL',
+    symbol: 'POL',
     decimals: 18,
   },
   rpcUrls: ['https://rpc-amoy.polygon.technology/'],
