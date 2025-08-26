@@ -1,7 +1,8 @@
 // ipfsService.js
 import axios from "axios";
 
-
+const PINATA_API_KEY = "a2953bccc64721478c37";
+const PINATA_SECRET_API_KEY = "fb3d3094644da3ebc694d85012f638c53a064ef72811ebf8042de50b69c98054";
 
 const PINATA_GATEWAY = "https://gateway.pinata.cloud/ipfs/";
 
@@ -13,8 +14,8 @@ const uploadJSONToIPFS = async (data) => {
       data,
       {
         headers: {
-          pinata_api_key: process.env.PINATA_API_KEY,
-          pinata_secret_api_key: process.env.PINATA_SECRET_API_KEY,
+          pinata_api_key: PINATA_API_KEY,
+          pinata_secret_api_key: PINATA_SECRET_API_KEY,
         },
       }
     );
