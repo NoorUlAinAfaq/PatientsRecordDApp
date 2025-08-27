@@ -2,15 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { Web3 } from 'web3';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { Container, Alert, Spinner } from 'react-bootstrap';
+
+// Import child components for different user dashboards
 import WalletConnection from './components/WalletConnection';
 import PatientDashboard from './components/PatientDashboard';
 import DoctorDashboard from './components/DoctorDashboard';
 import AdminDashboard from './components/AdminDashboard';
 
-// Replace with your deployed contract address
+// ----------------- Smart Contract Configuration -----------------
+
+// Replace this with the address of your deployed contract on Polygon Amoy
 const CONTRACT_ADDRESS = '0xffa56458e608F1d5E755E87d73141eb752035097';
 
-// Your contract ABI (copy from Remix after compilation)
+// ABI (Application Binary Interface) – 
+// This describes the contract’s functions and events so Web3 can interact with it.
+// Replace this with the abi of your deployed contract on Polygon Amoy
+
 const CONTRACT_ABI = [
 	{
 		"inputs": [],
@@ -445,66 +452,70 @@ const CONTRACT_ABI = [
 		"type": "function"
 	}
 ]
-// Polygon Amoy Testnet Configuration
+
+// Polygon Amoy Testnet settings for MetaMask
 const POLYGON_AMOY_CONFIG = {
-  chainId: '0x13882', // 80002 in hex
+  chainId: '0x13882', // Hexadecimal for 80002
   chainName: 'Polygon Amoy Testnet',
   nativeCurrency: {
     name: 'POL',
     symbol: 'POL',
     decimals: 18,
   },
-  rpcUrls: ['https://polygon-amoy.g.alchemy.com/v2/Qdl451OveKTEN9MfquBiz'],
+  rpcUrls: ['https://polygon-amoy.g.alchemy.com/v2/Qdl451OveKTEN9MfquBiz'], // Replace with your own RPC
   blockExplorerUrls: ['https://amoy.polygonscan.com/'],
 };
 
+// ----------------- Main App Component -----------------
 function App() {
-  const [web3, setWeb3] = useState(null);
-  const [account, setAccount] = useState('');
-  const [contract, setContract] = useState(null);
-  const [userRole, setUserRole] = useState(''); // 'admin', 'doctor', 'patient'
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  // React state variables
+  const [web3, setWeb3] = useState(null);       // Web3 instance for blockchain connection
+  const [account, setAccount] = useState('');   // User’s connected wallet address
+  const [contract, setContract] = useState(null); // Smart contract instance
+  const [userRole, setUserRole] = useState(''); // Role: Admin, Doctor, or Patient
+  const [loading, setLoading] = useState(false); // Loading indicator
+  const [error, setError] = useState('');       // Error messages
 
-  // Initialize Web3 and check connection
+  // When web3, account, and contract are ready → determine user role
   useEffect(() => {
     if (web3 && account && contract) {
       checkUserRole();
     }
   }, [web3, account, contract]);
 
+  // ----------------- Connect Wallet -----------------
   const connectWallet = async () => {
     try {
       setLoading(true);
       setError('');
 
-      // Check if MetaMask is installed
+      // Ensure MetaMask is installed
       if (typeof window.ethereum === 'undefined') {
         throw new Error('MetaMask is not installed');
       }
 
-      // Request account access
+      // Request wallet connection
       const accounts = await window.ethereum.request({
         method: 'eth_requestAccounts',
       });
 
       if (accounts.length === 0) {
-        throw new Error('No accounts found');
+        throw new Error('No accounts found in MetaMask');
       }
 
-      // Initialize Web3
+      // Initialize Web3 with MetaMask provider
       const web3Instance = new Web3(window.ethereum);
       setWeb3(web3Instance);
-      setAccount(accounts[0]);
+      setAccount(accounts[0]); // Use first connected account
 
-      // Check and switch to Polygon Amoy network
+      // Ensure user is connected to Polygon Amoy testnet
       try {
         await window.ethereum.request({
           method: 'wallet_switchEthereumChain',
           params: [{ chainId: POLYGON_AMOY_CONFIG.chainId }],
         });
       } catch (switchError) {
-        // If network doesn't exist, add it
+        // If Amoy network not found → add it
         if (switchError.code === 4902) {
           await window.ethereum.request({
             method: 'wallet_addEthereumChain',
@@ -513,7 +524,7 @@ function App() {
         }
       }
 
-      // Initialize contract
+      // Create a contract instance to interact with deployed smart contract
       const contractInstance = new web3Instance.eth.Contract(
         CONTRACT_ABI,
         CONTRACT_ADDRESS
@@ -527,23 +538,24 @@ function App() {
     }
   };
 
+  // ----------------- Check User Role -----------------
   const checkUserRole = async () => {
     try {
-      // Check if user is admin
+      // Admin: check if account matches contract admin address
       const adminAddress = await contract.methods.admin().call();
       if (adminAddress.toLowerCase() === account.toLowerCase()) {
         setUserRole('Admin');
         return;
       }
 
-      // Check if user is authorized doctor
+      // Doctor: check if account is in authorized doctors list
       const isDoctor = await contract.methods.isAuthorizedDoctor(account).call();
       if (isDoctor) {
         setUserRole('Doctor');
         return;
       }
 
-      // Default to patient
+      // Otherwise → assume patient role
       setUserRole('Patient');
     } catch (error) {
       console.error('Error checking user role:', error);
@@ -551,6 +563,7 @@ function App() {
     }
   };
 
+  // ----------------- Disconnect Wallet -----------------
   const disconnect = () => {
     setWeb3(null);
     setAccount('');
@@ -558,9 +571,10 @@ function App() {
     setUserRole('');
   };
 
-  // Listen for account changes
+  // ----------------- MetaMask Event Listeners -----------------
   useEffect(() => {
     if (window.ethereum) {
+      // If user switches account → update state
       window.ethereum.on('accountsChanged', (accounts) => {
         if (accounts.length === 0) {
           disconnect();
@@ -569,6 +583,7 @@ function App() {
         }
       });
 
+      // If user switches network → reload the app
       window.ethereum.on('chainChanged', () => {
         window.location.reload();
       });
@@ -581,6 +596,7 @@ function App() {
     };
   }, []);
 
+  // ----------------- Render Role-Based Dashboards -----------------
   const renderDashboard = () => {
     const props = { web3, account, contract };
 

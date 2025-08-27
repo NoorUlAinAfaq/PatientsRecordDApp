@@ -17,7 +17,7 @@ const AdminDashboard = ({ web3, account, contract }) => {
   useEffect(() => {
     if (contract && account) {
       loadAuthorizedDoctors();
-      loadDoctorEvents();
+    //  loadDoctorEvents();
       loadContractStats();
     }
   }, [contract, account]);
@@ -55,39 +55,7 @@ const AdminDashboard = ({ web3, account, contract }) => {
     }
   };
 
-  // Load all doctor authorization events from blockchain
-  const loadDoctorEvents = async () => {
-    try {
-      console.log('Loading doctor events...');
-      
-      // Get all DoctorAuthorized events
-      const authorizedEvents = await contract.getPastEvents('DoctorAuthorized', {
-        fromBlock: 0,
-        toBlock: 'latest'
-      });
-
-      console.log('Authorized Events:', authorizedEvents);
-
-      // Get all DoctorRevoked events
-      const revokedEvents = await contract.getPastEvents('DoctorRevoked', {
-        fromBlock: 0,
-        toBlock: 'latest'
-      });
-
-      console.log('Revoked Events:', revokedEvents);
-
-      // Combine and sort events by block number
-      const allEvents = [...authorizedEvents, ...revokedEvents].sort((a, b) => 
-        a.blockNumber - b.blockNumber
-      );
-
-      setAllDoctorEvents(allEvents);
-
-    } catch (error) {
-      console.error('Error loading doctor events:', error);
-    }
-  };
-
+  
   const authorizeDoctor = async (e) => {
     e.preventDefault();
     if (!web3.utils.isAddress(doctorAddress)) {
@@ -126,7 +94,7 @@ const AdminDashboard = ({ web3, account, contract }) => {
       // Reload data
       await Promise.all([
         loadAuthorizedDoctors(),
-        loadDoctorEvents(),
+       // loadDoctorEvents(),
         loadContractStats()
       ]);
       
@@ -175,7 +143,7 @@ const AdminDashboard = ({ web3, account, contract }) => {
       // Reload data
       await Promise.all([
         loadAuthorizedDoctors(),
-        loadDoctorEvents(),
+        //loadDoctorEvents(),
         loadContractStats()
       ]);
 
@@ -213,7 +181,7 @@ const AdminDashboard = ({ web3, account, contract }) => {
     try {
       await Promise.all([
         loadAuthorizedDoctors(),
-        loadDoctorEvents(),
+       // loadDoctorEvents(),
         loadContractStats()
       ]);
     } catch (error) {
