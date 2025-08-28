@@ -1,32 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Form, Alert, ListGroup, Badge, Spinner } from 'react-bootstrap';
 
+// AdminDashboard component to manage doctors in the system
 const AdminDashboard = ({ web3, account, contract }) => {
-  const [doctorAddress, setDoctorAddress] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
-  const [authorizedDoctors, setAuthorizedDoctors] = useState([]);
-  const [allDoctorEvents, setAllDoctorEvents] = useState([]);
-  const [checkAddress, setCheckAddress] = useState('');
+  // State variables
+  const [doctorAddress, setDoctorAddress] = useState(''); // input field for doctor address
+  const [loading, setLoading] = useState(false); // show loading spinner during blockchain calls
+  const [message, setMessage] = useState({ type: '', text: '' }); // feedback messages for user
+  const [authorizedDoctors, setAuthorizedDoctors] = useState([]); // list of authorized doctors
+  const [allDoctorEvents, setAllDoctorEvents] = useState([]); // (optional) events history from blockchain
+  const [checkAddress, setCheckAddress] = useState(''); // input field for checking doctor status
   const [contractStats, setContractStats] = useState({
     totalRecords: 0,
     totalDoctors: 0,
     adminAddress: ''
   });
 
+  // When component mounts or contract/account changes, load data from blockchain
   useEffect(() => {
     if (contract && account) {
       loadAuthorizedDoctors();
-    //  loadDoctorEvents();
+      // loadDoctorEvents(); // left as optional
       loadContractStats();
     }
   }, [contract, account]);
 
-  // Load authorized doctors using the contract's getAuthorizedDoctors function
+  // 🔹 Fetch authorized doctors from blockchain
   const loadAuthorizedDoctors = async () => {
     try {
       console.log('Loading authorized doctors from contract...');
-      const doctors = await contract.methods.getAuthorizedDoctors().call();
+      const doctors = await contract.methods.getAuthorizedDoctors().call(); // read-only call
       console.log('Authorized doctors from contract:', doctors);
       setAuthorizedDoctors(doctors);
     } catch (error) {
@@ -38,12 +41,12 @@ const AdminDashboard = ({ web3, account, contract }) => {
     }
   };
 
-  // Load contract statistics
+  // 🔹 Fetch contract statistics like record count, admin address, total doctors
   const loadContractStats = async () => {
     try {
-      const recordCount = await contract.methods.recordCount().call();
-      const adminAddress = await contract.methods.admin().call();
-      const doctors = await contract.methods.getAuthorizedDoctors().call();
+      const recordCount = await contract.methods.recordCount().call(); // total medical records
+      const adminAddress = await contract.methods.admin().call(); // contract admin
+      const doctors = await contract.methods.getAuthorizedDoctors().call(); // list of doctors
       
       setContractStats({
         totalRecords: recordCount,
@@ -55,9 +58,11 @@ const AdminDashboard = ({ web3, account, contract }) => {
     }
   };
 
-  
+  // 🔹 Function to authorize a new doctor
   const authorizeDoctor = async (e) => {
-    e.preventDefault();
+    e.preventDefault(); // prevent form reload
+
+    // Validate Ethereum address
     if (!web3.utils.isAddress(doctorAddress)) {
       setMessage({ type: 'danger', text: 'Please enter a valid Ethereum address' });
       return;
@@ -67,7 +72,7 @@ const AdminDashboard = ({ web3, account, contract }) => {
       setLoading(true);
       setMessage({ type: '', text: '' });
 
-      // Check if already authorized
+      // Check if doctor is already authorized
       const isAlreadyAuthorized = await contract.methods.isAuthorizedDoctor(doctorAddress).call();
       if (isAlreadyAuthorized) {
         setMessage({ type: 'warning', text: 'Doctor is already authorized' });
@@ -75,13 +80,13 @@ const AdminDashboard = ({ web3, account, contract }) => {
         return;
       }
 
-      // Estimate gas
+      // Estimate gas before sending transaction
       const gasEstimate = await contract.methods.authorizeDoctor(doctorAddress).estimateGas({ from: account });
       
-      // Send transaction
+      // Send transaction to blockchain (costs gas)
       const result = await contract.methods.authorizeDoctor(doctorAddress).send({
         from: account,
-        gas: Math.floor(Number(gasEstimate) * 1.2) // Add 20% buffer
+        gas: Math.floor(Number(gasEstimate) * 1.2) // add 20% buffer for safety
       });
 
       console.log('Doctor authorized:', result);
@@ -91,13 +96,14 @@ const AdminDashboard = ({ web3, account, contract }) => {
         text: `Doctor ${doctorAddress} has been authorized successfully!` 
       });
       
-      // Reload data
+      // Refresh UI data
       await Promise.all([
         loadAuthorizedDoctors(),
-       // loadDoctorEvents(),
+        // loadDoctorEvents(),
         loadContractStats()
       ]);
       
+      // Clear input field
       setDoctorAddress('');
 
     } catch (error) {
@@ -111,12 +117,13 @@ const AdminDashboard = ({ web3, account, contract }) => {
     }
   };
 
+  // 🔹 Function to revoke a doctor’s authorization
   const revokeDoctor = async (address) => {
     try {
       setLoading(true);
       setMessage({ type: '', text: '' });
 
-      // Check if doctor is authorized
+      // First check if doctor is authorized
       const isAuthorized = await contract.methods.isAuthorizedDoctor(address).call();
       if (!isAuthorized) {
         setMessage({ type: 'warning', text: 'Doctor is not currently authorized' });
@@ -127,7 +134,7 @@ const AdminDashboard = ({ web3, account, contract }) => {
       // Estimate gas
       const gasEstimate = await contract.methods.revokeDoctor(address).estimateGas({ from: account });
       
-      // Send transaction
+      // Send revoke transaction
       const result = await contract.methods.revokeDoctor(address).send({
         from: account,
         gas: Math.floor(Number(gasEstimate) * 1.2)
@@ -140,10 +147,10 @@ const AdminDashboard = ({ web3, account, contract }) => {
         text: `Doctor ${address} has been revoked successfully!` 
       });
       
-      // Reload data
+      // Refresh data
       await Promise.all([
         loadAuthorizedDoctors(),
-        //loadDoctorEvents(),
+        // loadDoctorEvents(),
         loadContractStats()
       ]);
 
@@ -158,6 +165,7 @@ const AdminDashboard = ({ web3, account, contract }) => {
     }
   };
 
+  // 🔹 Function to check if a given address is an authorized doctor
   const checkDoctorStatus = async () => {
     if (!checkAddress || !web3.utils.isAddress(checkAddress)) {
       setMessage({ type: 'danger', text: 'Please enter a valid address to check' });
@@ -176,12 +184,13 @@ const AdminDashboard = ({ web3, account, contract }) => {
     }
   };
 
+  // 🔹 Refresh dashboard data (doctors + stats)
   const refreshData = async () => {
     setLoading(true);
     try {
       await Promise.all([
         loadAuthorizedDoctors(),
-       // loadDoctorEvents(),
+        // loadDoctorEvents(),
         loadContractStats()
       ]);
     } catch (error) {
@@ -190,6 +199,7 @@ const AdminDashboard = ({ web3, account, contract }) => {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="container mt-4">

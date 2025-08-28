@@ -2,39 +2,43 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Form, Alert, Table, Modal, Badge, Spinner, Tab, Tabs, ListGroup, ProgressBar } from 'react-bootstrap';
 import { uploadToIPFS, getFromIPFS } from '../services/ipfsService';
 
+// DoctorDashboard component: doctors can create and view patient medical records
 const DoctorDashboard = ({ web3, account, contract }) => {
-  const [patientAddress, setPatientAddress] = useState('');
-  const [medicalData, setMedicalData] = useState({
+  // 🔹 State variables for form inputs and app data
+  const [patientAddress, setPatientAddress] = useState(''); // patient Ethereum address
+  const [medicalData, setMedicalData] = useState({ // basic medical record fields
     patientName: '',
     diagnosis: '',
     treatment: '',
     notes: '',
-    date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split('T')[0] // default to today's date
   });
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
-  const [doctorRecords, setDoctorRecords] = useState([]);
-  const [showModal, setShowModal] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState(null);
-  const [ipfsData, setIpfsData] = useState('');
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [authorizedDoctors, setAuthorizedDoctors] = useState([]);
-  const [checkingAuthorization, setCheckingAuthorization] = useState(true);
+  const [loading, setLoading] = useState(false); // global loading indicator
+  const [message, setMessage] = useState({ type: '', text: '' }); // success/error/info messages
+  const [doctorRecords, setDoctorRecords] = useState([]); // doctor’s uploaded records
+  const [showModal, setShowModal] = useState(false); // modal for viewing record details
+  const [selectedRecord, setSelectedRecord] = useState(null); // currently selected record
+  const [ipfsData, setIpfsData] = useState(''); // raw data fetched from IPFS
+  const [isAuthorized, setIsAuthorized] = useState(false); // check if doctor is allowed
+  const [authorizedDoctors, setAuthorizedDoctors] = useState([]); // list of authorized docs
+  const [checkingAuthorization, setCheckingAuthorization] = useState(true); // spinner while checking
 
-  // NEW: file upload state
-  const [files, setFiles] = useState([]); // Array<File>
-  const [uploadProgress, setUploadProgress] = useState({}); // {filename: percent}
-  const [selectedAttachment, setSelectedAttachment] = useState(null); // { name, cid, type }
+  // 🔹 File upload state for attachments
+  const [files, setFiles] = useState([]); // files chosen by doctor
+  const [uploadProgress, setUploadProgress] = useState({}); // track % progress for each file
+  const [selectedAttachment, setSelectedAttachment] = useState(null); // currently previewed attachment
 
+  // Run once when component mounts OR account changes
   useEffect(() => {
-    checkAuthorization();
-    loadDoctorRecords();
+    checkAuthorization();   // check if doctor is authorized
+    loadDoctorRecords();    // load any records linked to this doctor
   }, [account]);
 
+  // 🔹 Check if current account is an authorized doctor
   const checkAuthorization = async () => {
     try {
       setCheckingAuthorization(true);
-      const authorized = await contract.methods.authorizedDoctors(account).call();
+      const authorized = await contract.methods.authorizedDoctors(account).call(); // smart contract call
       setIsAuthorized(authorized);
       if (authorized) {
         setAuthorizedDoctors([{ address: account, authorized: true }]);
@@ -47,12 +51,13 @@ const DoctorDashboard = ({ web3, account, contract }) => {
     }
   };
 
-  // Replace the loadDoctorRecords function in DoctorDashboard.js with this:
+  // 🔹 Load all patient records created by this doctor
   const loadDoctorRecords = async () => {
     try {
       setLoading(true);
       const isAuthorized = await contract.methods.isAuthorizedDoctor(account).call();
       if (!isAuthorized) {
+        // doctor is not authorized → prevent record creation
         setMessage({
           type: 'warning',
           text: 'You are not authorized as a doctor. Please contact the admin to get authorized.'
@@ -62,33 +67,32 @@ const DoctorDashboard = ({ web3, account, contract }) => {
         return;
       }
 
-      try {
-        const recordIds = await contract.methods.getDoctorRecords(account).call({ from: account });
-        if (!recordIds || recordIds.length === 0) {
-          setDoctorRecords([]);
-          setLoading(false);
-          return;
-        }
+      // Fetch record IDs associated with doctor
+      const recordIds = await contract.methods.getDoctorRecords(account).call({ from: account });
+      if (!recordIds || recordIds.length === 0) {
+        setDoctorRecords([]);
+        setLoading(false);
+        return;
+      }
 
-        const records = [];
-        for (let i = 0; i < recordIds.length; i++) {
-          const id = recordIds[i];
-          try {
-            const record = await contract.methods.getRecord(id).call({ from: account });
-            records.push(record);
-          } catch (recordError) {
-            console.error(`Error loading record ${id}:`, recordError);
-          }
+      // Fetch each record details from blockchain
+      const records = [];
+      for (let i = 0; i < recordIds.length; i++) {
+        const id = recordIds[i];
+        try {
+          const record = await contract.methods.getRecord(id).call({ from: account });
+          records.push(record);
+        } catch (recordError) {
+          console.error(`Error loading record ${id}:`, recordError);
         }
-        setDoctorRecords(records);
-        if (records.length === 0) {
-          setMessage({
-            type: 'info',
-            text: `Found ${recordIds.length} record ID(s) but couldn't load the record details. Check console for errors.`
-          });
-        }
-      } catch (getDoctorRecordsError) {
-        console.error('Error calling getDoctorRecords:', getDoctorRecordsError);
+      }
+      setDoctorRecords(records);
+
+      if (records.length === 0) {
+        setMessage({
+          type: 'info',
+          text: `Found ${recordIds.length} record ID(s) but couldn't load the record details.`
+        });
       }
     } catch (error) {
       console.error('Error in loadDoctorRecords:', error);
@@ -101,10 +105,12 @@ const DoctorDashboard = ({ web3, account, contract }) => {
     }
   };
 
-  // ======== NEW: File upload helpers ========
+  // ========== FILE UPLOAD HELPERS ==========
+
+  // When doctor selects files → add to state
   const handleFileChange = (e) => {
     const picked = Array.from(e.target.files || []);
-    // De-duplicate by name + size + lastModified
+    // Avoid duplicates by checking name+size+lastModified
     const key = (f) => `${f.name}-${f.size}-${f.lastModified}`;
     const existingKeys = new Set(files.map(key));
     const merged = [...files];
@@ -112,26 +118,27 @@ const DoctorDashboard = ({ web3, account, contract }) => {
     setFiles(merged);
   };
 
+  // Remove a file from selected list
   const removeFile = (idx) => {
     setFiles((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  // Gateway link for IPFS content
   const gatewayUrl = (cid, path = '') => `https://ipfs.io/ipfs/${cid}${path ? `/${path}` : ''}`;
 
-  // Upload each file to IPFS. We assume uploadFileToIPFS can accept a File/Blob and returns { cid | IpfsHash | Hash } or a string.
+  // Upload each selected file to IPFS
   const uploadAttachmentsToIPFS = async () => {
     if (!files.length) return [];
     const attachments = [];
 
     for (const f of files) {
       try {
-        // Optional: optimistic progress
-        setUploadProgress((p) => ({ ...p, [f.name]: 5 }));
+        setUploadProgress((p) => ({ ...p, [f.name]: 5 })); // optimistic start
         const res = await uploadToIPFS(f, {
-          // Some ipfsService implementations support progress callbacks; if yours does, wire it here.
           onProgress: (pct) => setUploadProgress((p) => ({ ...p, [f.name]: Math.max(pct, 5) }))
         });
 
+        // CID returned by IPFS
         const cid = (res && (res.cid || res.IpfsHash || res.Hash || res.hash)) || (typeof res === 'string' ? res : null);
         if (!cid) throw new Error('IPFS upload did not return a CID');
 
@@ -145,16 +152,18 @@ const DoctorDashboard = ({ web3, account, contract }) => {
       } catch (e) {
         console.error('Failed to upload attachment', f.name, e);
         setMessage({ type: 'danger', text: `Failed to upload ${f.name}: ${e.message}` });
-        throw e; // Bubble up to stop record creation
+        throw e; // Stop record creation if any file fails
       }
     }
 
     return attachments;
   };
 
+  // 🔹 Create new patient record (upload → IPFS + save hash → blockchain)
   const createPatientRecord = async (e) => {
     e.preventDefault();
 
+    // Validate doctor & patient
     if (!isAuthorized) {
       setMessage({ type: 'danger', text: 'You are not authorized to create records. Contact admin.' });
       return;
@@ -168,37 +177,37 @@ const DoctorDashboard = ({ web3, account, contract }) => {
       setLoading(true);
       setMessage({ type: '', text: '' });
 
-      // 1) Upload any attached files to IPFS
+      // 1️⃣ Upload attachments to IPFS
       let attachments = [];
       if (files.length) {
         setMessage({ type: 'info', text: `Uploading ${files.length} attachment(s) to IPFS...` });
         attachments = await uploadAttachmentsToIPFS();
       }
 
-      // 2) Prepare the record manifest JSON
+      // 2️⃣ Create JSON manifest with medical data + file metadata
       const recordData = {
         ...medicalData,
         doctor: account,
         patient: patientAddress,
         timestamp: Date.now(),
-        attachments, // [{ name, type, size, cid }]
+        attachments,
         _schema: 'com.example.health.record.v1'
       };
 
-      // 3) Upload manifest JSON to IPFS
+      // 3️⃣ Upload manifest JSON to IPFS
       setMessage({ type: 'info', text: 'Uploading medical data (manifest) to IPFS...' });
       const ipfsHash = await uploadToIPFS(recordData);
 
-      // 4) Save manifest CID on-chain
+      // 4️⃣ Save IPFS hash on blockchain
       setMessage({ type: 'info', text: 'Creating record on blockchain...' });
       const gasEstimate = await contract.methods.createRecord(patientAddress, ipfsHash).estimateGas({ from: account });
 
       const result = await contract.methods.createRecord(patientAddress, ipfsHash).send({
         from: account,
-        gas: Math.floor(Number(gasEstimate) * 1.2)
+        gas: Math.floor(Number(gasEstimate) * 1.2) // add buffer
       });
 
-      // Persist created record id locally as backup
+      // 5️⃣ Get record ID from blockchain event
       let recordId;
       if (result.events && result.events.RecordCreated) {
         recordId = result.events.RecordCreated.returnValues.recordId;
@@ -207,6 +216,7 @@ const DoctorDashboard = ({ web3, account, contract }) => {
         recordId = recordCountBigInt.toString();
       }
 
+      // Backup locally in case blockchain call doesn’t return
       const existing = JSON.parse(localStorage.getItem(`doctorRecords_${account}`) || '[]');
       const idStr = recordId.toString();
       if (!existing.includes(idStr)) {
@@ -214,15 +224,16 @@ const DoctorDashboard = ({ web3, account, contract }) => {
         localStorage.setItem(`doctorRecords_${account}`, JSON.stringify(existing));
       }
 
-      setMessage({ type: 'success', text: `✅ Patient record created successfully! Record ID: ${recordId}` });
+      // ✅ Success
+      setMessage({ type: 'success', text: `Patient record created successfully! Record ID: ${recordId}` });
 
-      // Reset form & files
+      // Reset form
       setPatientAddress('');
       setMedicalData({ patientName: '', diagnosis: '', treatment: '', notes: '', date: new Date().toISOString().split('T')[0] });
       setFiles([]);
       setUploadProgress({});
 
-      // Refresh list
+      // Refresh record list after a short delay
       setTimeout(() => loadDoctorRecords(), 1200);
     } catch (error) {
       console.error('Error creating record:', error);
@@ -232,7 +243,7 @@ const DoctorDashboard = ({ web3, account, contract }) => {
     }
   };
 
-  // Enhanced viewRecord function with file-aware display
+  // 🔹 Fetch record details from IPFS & show in modal
   const viewRecord = async (record) => {
     try {
       setLoading(true);
@@ -244,7 +255,7 @@ const DoctorDashboard = ({ web3, account, contract }) => {
       setMessage({ type: 'info', text: 'Fetching record data from IPFS...' });
       const data = await getFromIPFS(record.ipfsHash);
 
-      // If service returned raw text, keep it; otherwise pretty print JSON
+      // Handle different IPFS return types
       if (data && typeof data === 'object' && !data.rawText) {
         setIpfsData(JSON.stringify(data, null, 2));
       } else if (data && data.rawText) {
@@ -265,6 +276,7 @@ const DoctorDashboard = ({ web3, account, contract }) => {
     }
   };
 
+  // 🔹 Utility: format timestamps nicely
   const formatTimestamp = (timestamp) => {
     try {
       const timestampNumber = typeof timestamp === 'bigint' ? Number(timestamp) : Number(timestamp?.toString?.() ?? timestamp);
@@ -276,11 +288,13 @@ const DoctorDashboard = ({ web3, account, contract }) => {
     }
   };
 
+  // 🔹 Utility: shorten Ethereum address
   const formatAddress = (address) => {
     if (!address) return '';
     return `${address.substring(0, 6)}...${address.substring(38)}`;
   };
 
+  // 🔹 Render file attachments from manifest
   const renderAttachmentsFromManifest = () => {
     try {
       const parsed = JSON.parse(ipfsData || '{}');
@@ -322,6 +336,7 @@ const DoctorDashboard = ({ web3, account, contract }) => {
             </tbody>
           </Table>
 
+          {/* Inline preview for images & PDFs */}
           {selectedAttachment && (
             <div className="mt-3">
               <h6 className="mb-2">Preview: {selectedAttachment.name}</h6>
@@ -343,6 +358,7 @@ const DoctorDashboard = ({ web3, account, contract }) => {
     }
   };
 
+  // Show spinner while checking doctor authorization
   if (checkingAuthorization) {
     return (
       <div className="text-center py-5">
@@ -351,6 +367,7 @@ const DoctorDashboard = ({ web3, account, contract }) => {
       </div>
     );
   }
+
 
   if (!isAuthorized) {
     return (
